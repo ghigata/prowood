@@ -1,0 +1,40 @@
+<?php
+
+/**
+ * @file
+ * Installer file of drupalmonitor_connector module
+ */
+
+/**
+ * Returns the table we use to track memory usage, request counts, etc.
+ *
+ * @param n/a
+ *
+ * @return
+ * The schema array
+ */
+function drupalmonitor_connector_schema() {
+  $schema['drupalmonitor_log'] = array(
+    'fields' => array(
+      'id'      => array('type' => 'serial', 'length' => 15, 'not null' => TRUE),
+      'q'      => array('type' => 'varchar', 'length' => 250, 'not null' => TRUE),
+      'dt'     => array('type' => 'int', 'length' => 11, 'not null' => TRUE),
+      'memory'    => array('type' => 'int', 'length' => 15, 'not null' => TRUE),
+      'execution_time'    => array('type' => 'int', 'length' => 11, 'not null' => TRUE)
+    ),
+    'primary key' => array('id'),
+  );
+  return $schema;
+}
+
+function drupalmonitor_connector_install() {
+   drupal_install_schema('drupalmonitor_log');
+}
+
+function drupalmonitor_connector_update_6001() {
+  drupal_install_schema('drupalmonitor_log');
+}
+
+function drupalmonitor_connector_uninstall() {
+  drupal_uninstall_schema('drupalmonitor_log');
+}

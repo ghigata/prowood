@@ -1,0 +1,120 @@
+<?php
+
+/**
+ * @file
+ * Module to handle importing and exporting of webforms, as well as adding the
+ * ability to set content type defaults.
+ */
+
+/**
+ * Implements hook_permission().
+ * This is required as we are handling PHP based files on import / export.
+ */
+function webform_share_permission() {
+  return array(
+    'access webform share functionality' => array(
+      'title' => t('Configure Webform Share'),
+      'description' => t('This permission enables the user to paste and run PHP code on the server.'),
+      'restrict access' => TRUE,
+    ),
+  );
+}
+
+/**
+ * Helper function to get the content type defaults.
+ */
+function webform_share_node_type_defaults($type) {
+  if (in_array($type, webform_variable_get('webform_node_types'))) {
+    return variable_get('webform_share_' . $type, '');
+  }
+  return '';
+}
+
+/**
+ * Implements hook_menu().
+ */
+function webform_share_menu() {
+  $items = array();
+  $items['node/%webform_menu/webform/ws-export'] = array(
+    'title' => 'Export',
+    'page callback' => 'webform_share_export',
+    'page arguments' => array(1),
+    'access callback' => 'node_access',
+    'access arguments' => array('update', 1),
+    'weight' => 5,
+    'type' => MENU_LOCAL_TASK,
+  );
+// Webform module update assumes no new components, so these reset and import
+// would need to clone internal webform functionality, something that I do not
+// want to do with this module.
+  return $items;
+}
+
+/**
+ * Menu callback to generate the webform dump.
+ */
+function webform_share_export($node) {
+  $webform = '$webform = ' . var_export($node->webform, TRUE) . ";\n\n";
+
+  if (ob_get_level()) {
+    ob_end_clean();
+  }
+
+  drupal_add_http_header('Content-Type', 'text/plain; charset=utf-8');
+  drupal_add_http_header('Content-Disposition', 'attachment; filename="webform-' . $node->type . '-' . $node->nid . '.txt";');
+  drupal_add_http_header('Content-Length', sprintf('%u', strlen($webform)));
+
+  print $webform;
+
+  exit();
+}
+
+/**
+ * This hooks into the node type form to add the webform share default settings
+ * textarea.
+ */
+function webform_share_form_node_type_form_alter(&$form, $form_state) {
+  // Targets content type edit forms
+  if (isset($form['#node_type'])) {
+    // Only adds the element to content types that have been tag for webforms.
+    if (in_array($form['#node_type']->type, webform_variable_get('webform_node_types'))) {
+      // Make sure that the user has permission.
+      if (user_access('access webform share functionality')) {
+        $form['workflow']['webform_share'] = array(
+          '#type' => 'textarea',
+          '#title' => t('Web form default components'),
+          '#default_value' => variable_get('webform_share_' . $form['#node_type']->type, ''),
+          // Access PHP so we need to control this.
+          '#access' => user_access('access webform share functionality'),
+          '#description' => t('Copy the code that was generated from a webform share export. This should not include &lt;?PHP or ?&gt; tags.'),
+        );
+      }
+    }
+  }
+}
+
+/**
+ * Implements hook_node_insert().
+ */
+function webform_share_node_insert($node) {
+  if ($type_defaults = webform_share_node_type_defaults($node->type)) {
+    if ($webform = _webform_share_eval($type_defaults)) {
+      $node->webform = $webform;
+      $node->webform['nid'] = $node->nid;
+      $node->webform['components'] = array_filter((array) $node->webform['components']);
+      foreach ($node->webform['components'] as $index => $component) {
+        $node->webform['components'][$index]['nid'] = $node->nid;
+        $node->webform['components'][$index]['pid'] = 0;
+      }
+    }
+  }
+}
+
+/**
+ * Private helper function to assist in getting the information from the
+ * webform dump.
+ */
+function _webform_share_eval($str) {
+  eval($str);
+  return $webform;
+}

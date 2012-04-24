@@ -1,0 +1,175 @@
+<?php
+
+DEFINE('DRUPALMONITOR_VERSION', '7.1.9');
+
+
+include('drupalmonitor_connector.user.inc');
+include('drupalmonitor_connector.files.inc');
+include('drupalmonitor_connector.load.inc');
+//include('drupalmonitor_connector.watchdog.inc');
+include('drupalmonitor_connector.status.inc');
+include('drupalmonitor_connector.node.inc');
+
+// hook_menu implementation
+function drupalmonitor_connector_menu() {
+  $items['drupalmonitor'] = array(
+    'title' => 'Drupal Monitor',
+    'page callback' => 'drupalmonitor_connector_page_data',
+    'access arguments' => array('access content'),
+    'type' => MENU_CALLBACK,
+  );
+  $items['admin/config/system/drupalmonitor'] = array(
+    'title' => 'Drupalmonitor.com',
+    'page callback' => 'drupalmonitor_connector_page_settings',
+    'access arguments' => array('administer drupalmonitor'),
+    'description' => 'Manage settings for Drupalmonitor connector module. (Security hash, Logging)',
+  );
+  return $items;
+}
+
+function drupalmonitor_connector_perm() {
+  return array('administer drupalmonitor');
+}
+
+function drupalmonitor_connector_page_settings() {
+  $output = drupal_get_form('drupalmonitor_connector_settings_form');
+  return $output;
+}
+
+function drupalmonitor_connector_settings_form() {
+  $form['drupalmonitor_hash'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Drupalmonitor.com Website Security Hash'),
+    '#default_value' => variable_get('drupalmonitor_hash', ''),
+    '#size' => 60,
+    '#maxlength' => 64,
+    '#description' => t('This hash should be the same string as in your site settings on <a href="http://www.drupalmonitor.com/websites" target="_blank">drupalmonitor.com/websites</a>.'),
+  );
+  
+  $form['drupalmonitor_memory_monitoring'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Enable Drupalmonitor.com Logging'),
+    '#default_value' => variable_get('drupalmonitor_memory_monitoring', ''),
+    '#size' => 60,
+    '#maxlength' => 64,
+    '#description' => t('If enabled, the drupalmonitor.com module will log all page requests on your Drupal site. Logs are needed to generate load graphs on <a href="http://www.drupalmonitor.com/websites" target="_blank">drupalmonitor.com/websites</a>. On high traffic websites, logging can be time consuming and slow your website.'),
+  );
+  
+  $form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('Save'),
+  );
+  return $form;
+}
+
+
+function drupalmonitor_connector_settings_form_submit($form, &$form_state) {
+  variable_set('drupalmonitor_hash', $form_state['values']['drupalmonitor_hash']);
+  variable_set('drupalmonitor_memory_monitoring', $form_state['values']['drupalmonitor_memory_monitoring']);
+  drupal_set_message(t('Drupalmonitor.com settings saved.'));
+}
+
+function drupalmonitor_connector_page_data() {
+
+  $starttime = microtime();
+  
+  $hash_request = '';
+  $hash_site = variable_get('drupalmonitor_hash', '');
+  
+  if ($_GET['hash'] != '') {
+    $hash_request = $_GET['hash'];
+  }
+
+  if ($hash_site == '' || $hash_site == $hash_request) {
+    // Set correct headers
+    header("Pragma: no-cache");
+    header("Expires: 0");
+    header('Content-type: application/json');
+  
+    // User Count Data
+    $info['user_usercount'] = drupalmonitor_connector_get_user_usercount();
+    $info['user_activesessioncount_300s'] = drupalmonitor_connector_get_user_activesessioncount_300s();
+    $info['user_loggedinsessioncount_300s'] = drupalmonitor_connector_get_user_loggedinsessioncount_300s();
+  
+    // Files Count Data
+    $info['files_filescount'] = drupalmonitor_connector_get_files_filescount();
+    $info['files_filesfoldersize'] = drupalmonitor_connector_get_files_filesfoldersize();
+  
+    // Load Cound Data
+    $info['load_requestscount_300s'] = drupalmonitor_connector_get_load_requestscount_300s();
+    $info['load_requestspersecondcount_300s'] = drupalmonitor_connector_get_load_requestspersecondcount_300s();
+    $info['load_slowrequestscount_300s'] = drupalmonitor_connector_get_load_slowrequestscount_300s();
+    $info['load_slowrequests_300s'] = drupalmonitor_connector_get_load_slowrequests_300s();
+    $info['load_maxmemoryusage'] = drupalmonitor_connector_get_load_maxmemoryusage();
+    $info['load_apcenabled'] = drupalmonitor_connector_load_apcenabled();
+  
+  /*
+    // Watchdog Counts
+    $info['drupalmonitor_get_watchdog_pagenotfoundcount_300s'] = drupalmonitor_get_watchdog_pagenotfoundcount_300s();
+    $info['drupalmonitor_get_watchdog_user_300s'] = drupalmonitor_get_watchdog_user_300s();
+    $info['drupalmonitor_get_watchdog_accessdenied_300s'] = drupalmonitor_get_watchdog_accessdenied_300s();
+    $info['drupalmonitor_get_watchdog_mail_300s'] = drupalmonitor_get_watchdog_mail_300s();
+    $info['drupalmonitor_get_watchdog_search_300s'] = drupalmonitor_get_watchdog_search_300s();
+    $info['drupalmonitor_get_watchdog_php_300s'] = drupalmonitor_get_watchdog_php_300s();
+    $info['drupalmonitor_get_watchdog_content_300s'] = drupalmonitor_get_watchdog_content_300s();
+  */
+    
+    // Node Contenttypes
+    $info['drupalmonitor_node_contenttypes'] = drupalmonitor_node_contenttypes();
+  
+    // Drupal Status
+    $info['tbl_system'] = drupalmonitor_connector_status_listmodules();
+    $info['tbl_variable'] = drupalmonitor_connector_status_listvars();
+
+    // Call hook_drupalmonitor()
+    $info['custom'] = module_invoke_all('drupalmonitor');
+
+    // Drupalmonitor infos
+    $info['drupalmonitor_version'] = DRUPALMONITOR_VERSION;
+    $info['drupalmonitor_executiontime'] = microtime() - $starttime;
+    $info['drupalmonitor_status'] = "OK";
+  } 
+  else {
+    $info['drupalmonitor_status'] = "NO ACCESS";
+  }
+  echo json_encode($info);
+  exit();
+}
+
+/**
+ * take time on init
+ *
+ * @param n/a
+ * @return n/a
+ */
+function drupalmonitor_connector_init() {
+  global $_drupalmonitor_connector_script_start_time;
+  $_drupalmonitor_connector_script_start_time = microtime(true);
+}
+
+/**
+ * take time on exit and save to db
+ *
+ * @param n/a
+ * @return n/a
+ */ 
+function drupalmonitor_connector_exit() {
+  global $_drupalmonitor_connector_script_start_time;
+  if (variable_get('drupalmonitor_memory_monitoring', 1) == 1) {
+    $diff = round(((microtime(true)-$_drupalmonitor_connector_script_start_time) * 1000));
+
+    if ($diff < 2147483648) {
+      // we can't use db_insert as that isn't reliably loaded in hook_exit() 
+      db_insert('drupalmonitor_log')
+        ->fields(
+          array(
+            'q' => $_GET['q'],
+            'memory' => memory_get_peak_usage(),
+            'dt' => REQUEST_TIME,
+            'execution_time' => $diff
+          )
+        )
+        ->execute();
+    }
+  }
+}

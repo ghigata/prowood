@@ -1,0 +1,7 @@
+<?php
+/**
+ * @file
+ * Code for the prowood_features feature.
+ */
+
+include_once('prowood_features.features.inc');

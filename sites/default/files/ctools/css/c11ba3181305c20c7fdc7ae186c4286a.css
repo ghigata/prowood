@@ -1,0 +1,5 @@
+/* css3pie */
+.not-front .postscript-top .view-content,.not-front .content-region .view-content,#search-form,ol.search-results,#search-form #edit-submit,#search-form #edit-keys,.slide-description, .node-product .node-readmore, .page-news .views-field-view-node, #block-views-listing-block_2 .views-field-field-image img,.node.full-node, #slide-nav
+{
+  behavior: url(/prowood/sites/all/libraries/PIE/PIE.htc);
+}

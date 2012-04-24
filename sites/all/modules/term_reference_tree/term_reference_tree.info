@@ -1,0 +1,12 @@
+name = Term Reference Tree
+description = An expanding/collapsing tree widget for selecting terms in a taxonomy term reference field
+package = Other
+
+dependencies[] = taxonomy
+
+; Information added by drupal.org packaging script on 2011-08-15
+version = "7.x-1.6"
+core = "7.x"
+project = "term_reference_tree"
+datestamp = "1313424719"
+
